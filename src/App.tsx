@@ -14,6 +14,9 @@ import { AndroidBottomNav, AppTab } from './components/AndroidBottomNav';
 import { IngredientsTab } from './components/IngredientsTab';
 import { FormulasTab } from './components/FormulasTab';
 import { WorksheetTab } from './components/WorksheetTab';
+import { DEFAULT_CVE_HEADER } from './assets/header';
+import { exportWorksheetToDocx } from './utils/docxGenerator';
+import { exportWorksheetToPdf } from './utils/pdfGenerator';
 import { Plus } from 'lucide-react';
 
 const STORAGE_KEY = 'cveCookedProductCostingWorksheet_v1';
@@ -267,6 +270,55 @@ export const App: React.FC = () => {
     window.print();
   };
 
+  const handleExportDocx = async () => {
+    showToast('Generating Word document (.docx)...');
+    try {
+      await exportWorksheetToDocx({
+        groupNo,
+        productName,
+        memberNames,
+        rows,
+        calcs,
+        currency,
+        headerImageUri: customHeaderImage !== null ? customHeaderImage : DEFAULT_CVE_HEADER,
+      });
+      showToast('Word document ready! Opening viewer / save...');
+    } catch (err) {
+      console.error('Word DOCX export failed:', err);
+      showToast('Word export failed. Please check device permissions.');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    const el = document.getElementById('printable-worksheet');
+    if (!el) {
+      setActiveTab('worksheet');
+      showToast('Switched to Worksheet tab. Preparing PDF...');
+      setTimeout(async () => {
+        const delayedEl = document.getElementById('printable-worksheet');
+        if (delayedEl) {
+          try {
+            await exportWorksheetToPdf(delayedEl, productName || 'Cooked_Product');
+            showToast('PDF ready! Opening viewer / save...');
+          } catch (e) {
+            console.error('PDF generation error:', e);
+            window.print();
+          }
+        }
+      }, 300);
+      return;
+    }
+    showToast('Generating PDF...');
+    try {
+      await exportWorksheetToPdf(el, productName || 'Cooked_Product');
+      showToast('PDF ready! Opening viewer / save...');
+    } catch (err) {
+      console.error('PDF export failed:', err);
+      showToast('PDF export failed, opening print dialog...');
+      window.print();
+    }
+  };
+
   // Derived calculations
   const calcs = useMemo(
     () =>
@@ -285,6 +337,8 @@ export const App: React.FC = () => {
         onLoadSample={handleLoadSample}
         onReset={handleReset}
         onPrint={handlePrint}
+        onExportDocx={handleExportDocx}
+        onExportPdf={handleExportPdf}
         onOpenWorksheetTab={() => setActiveTab('worksheet')}
         currentCurrency={currency}
         onSelectCurrency={handleSelectCurrency}
@@ -340,6 +394,7 @@ export const App: React.FC = () => {
             customHeaderImage={customHeaderImage}
             onUpdateHeaderImage={handleUpdateHeaderImage}
             onPrint={handlePrint}
+            onShowToast={showToast}
           />
         )}
       </main>

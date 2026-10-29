@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'Cooked Product Costing',
         short_name: 'FoodCosting',
         description: 'Food Technology cooked product costing, unit pricing, profit formulas, and worksheet',
-        theme_color: '#15803d',
+        theme_color: '#ea580c',
         background_color: '#f8fafc',
         display: 'standalone',
         orientation: 'portrait-primary',
@@ -45,6 +45,7 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 6 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
         runtimeCaching: [
           {

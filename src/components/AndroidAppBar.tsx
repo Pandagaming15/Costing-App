@@ -20,6 +20,7 @@ import {
   Moon,
   Coins,
   Check,
+  FileText,
 } from 'lucide-react';
 
 interface AndroidAppBarProps {
@@ -33,6 +34,8 @@ interface AndroidAppBarProps {
   isDarkEffective: boolean;
   onToggleTheme: () => void;
   themeColor: ColorTheme;
+  onExportDocx?: () => void;
+  onExportPdf?: () => void;
 }
 
 export const AndroidAppBar: React.FC<AndroidAppBarProps> = ({
@@ -45,6 +48,8 @@ export const AndroidAppBar: React.FC<AndroidAppBarProps> = ({
   isDarkEffective,
   onToggleTheme,
   themeColor,
+  onExportDocx,
+  onExportPdf,
 }) => {
   const isOnline = useOnlineStatus();
   const { isInstallable, isInstalled, install } = usePWAInstall();
@@ -198,14 +203,44 @@ export const AndroidAppBar: React.FC<AndroidAppBarProps> = ({
                     <button
                       type="button"
                       onClick={() => {
+                        setMenuOpen(false);
+                        if (onExportDocx) {
+                          onExportDocx();
+                        } else {
+                          onOpenWorksheetTab();
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-blue-50 dark:hover:bg-slate-700/60 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                    >
+                      <FileText className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      Save as Word (.docx)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        if (onExportPdf) {
+                          onExportPdf();
+                        } else {
+                          onOpenWorksheetTab();
+                        }
+                      }}
+                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-emerald-50 dark:hover:bg-slate-700/60 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                    >
+                      <Download className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                      Save as PDF
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         onOpenWorksheetTab();
                         setMenuOpen(false);
                         setTimeout(() => onPrint(), 150);
                       }}
-                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-emerald-50 dark:hover:bg-slate-700/60 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+                      className="w-full px-4 py-2.5 text-left text-sm font-medium hover:bg-slate-50 dark:hover:bg-slate-700/60 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 transition cursor-pointer"
                     >
-                      <Printer className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                      Print / Save as PDF
+                      <Printer className="w-4 h-4 text-slate-600 dark:text-slate-400" />
+                      Print Dialog
                     </button>
                     <div className="h-px bg-slate-200 dark:bg-slate-700 my-1" />
                     <button

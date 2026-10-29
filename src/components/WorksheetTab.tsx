@@ -4,7 +4,8 @@ import { CostingCalculations, CurrencyConfig, formatMoney, formatRawMoney } from
 import { ColorTheme } from '../utils/themeColors';
 import { DEFAULT_CVE_HEADER } from '../assets/header';
 import { exportWorksheetToPdf } from '../utils/pdfGenerator';
-import { Printer, Download, Upload, Trash2, RotateCcw, Loader2, FileCheck } from 'lucide-react';
+import { exportWorksheetToDocx } from '../utils/docxGenerator';
+import { Printer, Download, Upload, Trash2, RotateCcw, Loader2, FileCheck, FileText } from 'lucide-react';
 
 interface WorksheetTabProps {
   groupNo: string;
@@ -17,6 +18,7 @@ interface WorksheetTabProps {
   customHeaderImage: string | null;
   onUpdateHeaderImage: (dataUri: string | null) => void;
   onPrint: () => void;
+  onShowToast?: (msg: string) => void;
 }
 
 export const WorksheetTab: React.FC<WorksheetTabProps> = ({
@@ -30,10 +32,12 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
   customHeaderImage,
   onUpdateHeaderImage,
   onPrint,
+  onShowToast,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const printableAreaRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [isGeneratingDocx, setIsGeneratingDocx] = useState(false);
 
   // Use either the user's custom header or the provided default CVE Colleges header
   const currentBanner = customHeaderImage !== null ? customHeaderImage : DEFAULT_CVE_HEADER;
@@ -70,11 +74,35 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
     reader.readAsDataURL(file);
   };
 
+  const handleDownloadDocx = async () => {
+    setIsGeneratingDocx(true);
+    onShowToast?.('Generating Word document (.docx)...');
+    try {
+      await exportWorksheetToDocx({
+        groupNo,
+        productName,
+        memberNames,
+        rows,
+        calcs,
+        currency,
+        headerImageUri: currentBanner,
+      });
+      onShowToast?.('Word document ready! Opening viewer/save...');
+    } catch (err) {
+      console.error('Word DOCX export failed:', err);
+      onShowToast?.('Failed to export Word document. Please check device permissions.');
+    } finally {
+      setIsGeneratingDocx(false);
+    }
+  };
+
   const handleDownloadPdf = async () => {
     if (!printableAreaRef.current) return;
     setIsGeneratingPdf(true);
+    onShowToast?.('Generating PDF...');
     try {
       await exportWorksheetToPdf(printableAreaRef.current, productName || 'Cooked_Product');
+      onShowToast?.('PDF ready! Opening viewer/save...');
     } catch (err) {
       console.error('PDF export failed, falling back to print dialog:', err);
       onPrint();
@@ -92,15 +120,36 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
               <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-                Official School Worksheet & PDF Export
+                Official School Worksheet & Export
               </h3>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-              Includes preloaded official CVE Colleges header banner and A4 portrait print layout.
+              Save directly to phone directory or open in Word, Google Docs, WPS Office, or PDF viewer.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Word Document (.docx) Export */}
+            <button
+              type="button"
+              disabled={isGeneratingDocx}
+              onClick={handleDownloadDocx}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer"
+              title="Save to device or open in Microsoft Word, WPS Office, Google Docs"
+            >
+              {isGeneratingDocx ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Creating DOCX...</span>
+                </>
+              ) : (
+                <>
+                  <FileText className="w-4 h-4" />
+                  <span>Word (.docx)</span>
+                </>
+              )}
+            </button>
+
             {/* Direct PDF File Download */}
             <button
               type="button"
@@ -112,12 +161,12 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
               {isGeneratingPdf ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Generating PDF...
+                  <span>Creating PDF...</span>
                 </>
               ) : (
                 <>
                   <Download className="w-4 h-4" />
-                  Save / Download PDF
+                  <span>Save PDF</span>
                 </>
               )}
             </button>
@@ -130,7 +179,7 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
               title="Open system print and PDF dialog"
             >
               <Printer className="w-4 h-4" />
-              Print Dialog
+              <span>Print</span>
             </button>
           </div>
         </div>
@@ -232,11 +281,43 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
           </p>
         </div>
 
+        {/* Executive KPI Summary Metric Banner (Identical to app header) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 my-4">
+          <div className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">Total Cost</div>
+            <div className="text-base font-bold text-slate-900 dark:text-white font-mono">{formatMoney(totalCost, currency)}</div>
+            <div className="text-[9px] text-slate-400">Direct + ½ Indirect</div>
+          </div>
+          <div className="bg-slate-50 dark:bg-slate-800/80 p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 text-center">
+            <div className="text-[10px] font-bold text-blue-600 uppercase tracking-wider mb-0.5">Unit Cost</div>
+            <div className="text-base font-bold text-blue-700 dark:text-blue-400 font-mono">{formatRawMoney(unitCost, currency)}</div>
+            <div className="text-[9px] text-slate-400">{servings} servings yield</div>
+          </div>
+          <div className="bg-orange-50 dark:bg-orange-950/30 p-2.5 rounded-xl border border-orange-200 dark:border-orange-900/40 text-center">
+            <div className="text-[10px] font-bold text-orange-600 uppercase tracking-wider mb-0.5">Selling Price</div>
+            <div className="text-base font-bold text-orange-600 font-mono">{formatMoney(roundedPrice, currency)}</div>
+            <div className="text-[9px] text-orange-700 dark:text-orange-400">+{markupPercent}% Mark-up</div>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-950/30 p-2.5 rounded-xl border border-amber-200 dark:border-amber-900/40 text-center">
+            <div className="text-[10px] font-bold text-amber-700 uppercase tracking-wider mb-0.5">Batch Profit</div>
+            <div className="text-base font-bold text-amber-800 dark:text-amber-300 font-mono">{formatMoney(batchProfit, currency)}</div>
+            <div className="text-[9px] text-amber-600 dark:text-amber-400">{formatMoney(profitPerServingFromBatch, currency)} / serv.</div>
+          </div>
+        </div>
+
         {/* Section 1: Establish the Cost */}
         <section className="my-4">
-          <h2 className="text-[17px] font-bold border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2 text-slate-900 dark:text-white">
-            1. Establish the Cost
-          </h2>
+          <div className="flex items-center gap-2 border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white font-bold text-xs shrink-0"
+              style={{ backgroundColor: themeColor.hex }}
+            >
+              1
+            </span>
+            <h2 className="text-[17px] font-bold text-slate-900 dark:text-white m-0 p-0">
+              Establish the Cost
+            </h2>
+          </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 my-1.5">
             The direct expenses incurred to purchase the necessary ingredients for the recipe.
           </p>
@@ -276,36 +357,51 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
             </tfoot>
           </table>
 
-          <div className="formula-box">
-            <strong className="text-sm">Total Direct Cost = Add all ingredient costs</strong>
-            <div className="mathline">
+          <div className="formula-box" style={{ borderLeftColor: themeColor.hex }}>
+            <div className="formula-tag" style={{ color: themeColor.hex }}>Direct Cost Formula:</div>
+            <strong className="text-sm text-slate-800 dark:text-slate-200">Total Direct Cost = Add all ingredient costs</strong>
+            <div className="mathline text-slate-800 dark:text-slate-200">
               {rows.length > 0
                 ? rows.map((r) => formatMoney(r.cost, currency)).join(' + ') + ' = ' + formatMoney(directCost, currency)
                 : formatMoney(0, currency) + ' = ' + formatMoney(0, currency)}
+            </div>
+            <div className="formula-result-badge" style={{ borderLeftColor: themeColor.hex }}>
+              <span className="font-bold text-xs uppercase tracking-wide text-slate-700 dark:text-slate-300">Total Ingredient Cost:</span>
+              <span className="font-bold font-mono text-base" style={{ color: themeColor.hex }}>
+                {formatMoney(directCost, currency)}
+              </span>
             </div>
           </div>
         </section>
 
         {/* Section 2: Compute the Unit Cost */}
         <section className="my-4">
-          <h2 className="text-[17px] font-bold border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2 text-slate-900 dark:text-white">
-            2. Compute the Unit Cost
-          </h2>
+          <div className="flex items-center gap-2 border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white font-bold text-xs shrink-0"
+              style={{ backgroundColor: themeColor.hex }}
+            >
+              2
+            </span>
+            <h2 className="text-[17px] font-bold text-slate-900 dark:text-white m-0 p-0">
+              Compute the Unit Cost
+            </h2>
+          </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 my-1.5">
             The unit cost is the cost incurred to sell the cooked product. Divide the cumulative expenses by the
             number of servings or yield produced.
           </p>
 
-          <div className="formula-box">
-            <strong className="text-sm">Module formula:</strong>
-            <div className="formula-name">
+          <div className="formula-box" style={{ borderLeftColor: themeColor.hex }}>
+            <div className="formula-tag" style={{ color: themeColor.hex }}>Module formula:</div>
+            <div className="formula-name text-slate-800 dark:text-slate-200">
               Unit Cost ={' '}
               <span className="fraction">
                 <span className="numerator">Ingredient Cost + ½ of cost of ingredients</span>
                 <span className="denominator">No. of yields or servings</span>
               </span>
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-800 dark:text-slate-200">
               <span>=</span>
               <span className="fraction">
                 <span className="numerator">
@@ -314,72 +410,99 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
                 <span className="denominator">{servings} servings</span>
               </span>
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-800 dark:text-slate-200">
               <span>=</span>
               <span className="fraction">
                 <span className="numerator">{formatMoney(totalCost, currency)}</span>
                 <span className="denominator">{servings}</span>
               </span>
             </div>
-            <div className="mathline">
-              <span>=</span> {formatRawMoney(unitCost, currency)} per serving
+            <div className="formula-result-badge" style={{ borderLeftColor: themeColor.hex }}>
+              <span className="font-bold text-xs uppercase tracking-wide text-slate-700 dark:text-slate-300">Unit Cost Result:</span>
+              <span className="font-bold font-mono text-base" style={{ color: themeColor.hex }}>
+                = {formatRawMoney(unitCost, currency)} per serving
+              </span>
             </div>
           </div>
         </section>
 
         {/* Section 3: Pricing the Product (Page 2 break in print) */}
         <section className="my-4 page-break-section">
-          <h2 className="text-[17px] font-bold border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2 text-slate-900 dark:text-white">
-            3. Pricing the Product
-          </h2>
+          <div className="flex items-center gap-2 border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white font-bold text-xs shrink-0"
+              style={{ backgroundColor: themeColor.hex }}
+            >
+              3
+            </span>
+            <h2 className="text-[17px] font-bold text-slate-900 dark:text-white m-0 p-0">
+              Pricing the Product
+            </h2>
+          </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 my-1.5">
             Apply the mark-up to the unit cost to calculate the selling price per serving. Since the unit cost is
             already per serving, do not divide by the number of servings again.
           </p>
 
-          <div className="formula-box">
-            <strong className="text-sm">Module worked-example method:</strong>
-            <div className="formula-name">Selling Price per Serving = Unit Cost × (1 + Mark-up Rate)</div>
-            <div className="mathline">
+          <div className="formula-box" style={{ borderLeftColor: themeColor.hex }}>
+            <div className="formula-tag" style={{ color: themeColor.hex }}>Module worked-example method:</div>
+            <div className="formula-name text-slate-800 dark:text-slate-200">
+              Selling Price per Serving = Unit Cost × (1 + Mark-up Rate)
+            </div>
+            <div className="mathline text-slate-800 dark:text-slate-200">
               <span>=</span> {formatRawMoney(unitCost, currency)} × (1 + {markupRate.toFixed(2)})
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-800 dark:text-slate-200">
               <span>=</span> {formatRawMoney(unitCost, currency)} × {(1 + markupRate).toFixed(2)}
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-600 dark:text-slate-400">
               <span>=</span> {formatRawMoney(pricePerServing, currency, 5)}
             </div>
-            <div className="mathline final-math" style={{ color: themeColor.hex }}>
-              <span>=</span> {formatMoney(pricePerServing, currency)} per serving
+            <div className="formula-result-badge" style={{ borderLeftColor: themeColor.hex }}>
+              <span className="font-bold text-xs uppercase tracking-wide text-slate-700 dark:text-slate-300">Final Selling Price:</span>
+              <span className="font-bold font-mono text-base" style={{ color: themeColor.hex }}>
+                = {formatMoney(pricePerServing, currency)} per serving
+              </span>
             </div>
           </div>
         </section>
 
         {/* Section 4: Compute the Profit */}
         <section className="my-4">
-          <h2 className="text-[17px] font-bold border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2 text-slate-900 dark:text-white">
-            4. Compute the Profit
-          </h2>
+          <div className="flex items-center gap-2 border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white font-bold text-xs shrink-0"
+              style={{ backgroundColor: themeColor.hex }}
+            >
+              4
+            </span>
+            <h2 className="text-[17px] font-bold text-slate-900 dark:text-white m-0 p-0">
+              Compute the Profit
+            </h2>
+          </div>
           <p className="text-xs text-slate-600 dark:text-slate-400 my-1.5">
             Multiply the selling price per serving by the number of servings to find total sales. Then subtract
             the total production cost to find the profit earned from the whole batch.
           </p>
 
-          <div className="formula-box">
-            <strong className="text-sm">Profit formula:</strong>
-            <div className="formula-name">
+          <div className="formula-box" style={{ borderLeftColor: themeColor.hex }}>
+            <div className="formula-tag" style={{ color: themeColor.hex }}>Profit formula:</div>
+            <div className="formula-name text-slate-800 dark:text-slate-200">
               Total Profit = (Selling Price per Serving × Number of Servings) − Total Production Cost
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-800 dark:text-slate-200">
               = {formatMoney(roundedPrice, currency)} × {servings} = {formatMoney(totalSales, currency)} total sales
             </div>
-            <div className="mathline">
+            <div className="mathline text-slate-800 dark:text-slate-200">
               = {formatMoney(totalSales, currency)} − {formatMoney(totalCost, currency)}
             </div>
-            <div className="mathline final-math" style={{ color: themeColor.hex }}>
-              = {formatMoney(batchProfit, currency)} total profit for the batch
+            <div className="formula-result-badge amber">
+              <span className="font-bold text-xs uppercase tracking-wide text-amber-900 dark:text-amber-200">Total Batch Profit:</span>
+              <span className="font-bold font-mono text-base text-amber-700 dark:text-amber-300">
+                = {formatMoney(batchProfit, currency)}
+              </span>
             </div>
-            <div className="mathline">
+            <div className="mathline text-sm text-slate-600 dark:text-slate-400 mt-2">
               Profit per Serving = Total Profit ÷ Number of Servings = {formatMoney(profitPerServingFromBatch, currency)}
             </div>
           </div>
@@ -387,9 +510,17 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
 
         {/* Section 5: Costing Summary Table */}
         <section className="my-4">
-          <h2 className="text-[17px] font-bold border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2 text-slate-900 dark:text-white">
-            5. Costing Summary
-          </h2>
+          <div className="flex items-center gap-2 border-b border-slate-400 dark:border-slate-700 pb-1 mt-4 mb-2">
+            <span
+              className="inline-flex items-center justify-center w-6 h-6 rounded-full text-white font-bold text-xs shrink-0"
+              style={{ backgroundColor: themeColor.hex }}
+            >
+              5
+            </span>
+            <h2 className="text-[17px] font-bold text-slate-900 dark:text-white m-0 p-0">
+              Costing Summary
+            </h2>
+          </div>
 
           <table className="w-full border-collapse my-2 text-sm border border-slate-300 dark:border-slate-700">
             <tbody>
@@ -439,19 +570,19 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
                   {formatRawMoney(profitPerServing, currency, 5)}
                 </td>
               </tr>
-              <tr>
-                <th className="border border-slate-400 dark:border-slate-700 p-2 text-left bg-slate-100 dark:bg-slate-800/80 font-bold text-slate-900 dark:text-white">
+              <tr className="bg-amber-50/70 dark:bg-amber-950/30">
+                <th className="border border-slate-400 dark:border-slate-700 p-2 text-left font-bold text-amber-900 dark:text-amber-200">
                   Total profit for all servings
                 </th>
-                <td className="border border-slate-400 dark:border-slate-700 p-2 text-right font-mono font-bold text-slate-900 dark:text-white">
+                <td className="border border-slate-400 dark:border-slate-700 p-2 text-right font-mono font-bold text-amber-800 dark:text-amber-300">
                   {formatMoney(batchProfit, currency)}
                 </td>
               </tr>
-              <tr className="bg-slate-200/70 dark:bg-slate-800 font-bold text-base">
-                <th className="border border-slate-400 dark:border-slate-700 p-2 text-left text-slate-900 dark:text-white">
+              <tr className="bg-orange-50/80 dark:bg-orange-950/40 font-bold text-base">
+                <th className="border border-slate-400 dark:border-slate-700 p-2 text-left text-orange-950 dark:text-orange-200">
                   Selling price per serving
                 </th>
-                <td className="border border-slate-400 dark:border-slate-700 p-2 text-right font-mono font-bold text-base text-slate-900 dark:text-white">
+                <td className="border border-slate-400 dark:border-slate-700 p-2 text-right font-mono font-bold text-base text-orange-600 dark:text-orange-400">
                   {formatMoney(roundedPrice, currency)}
                 </td>
               </tr>
