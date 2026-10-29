@@ -1,8 +1,10 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { IngredientRow } from '../types';
 import { CostingCalculations, CurrencyConfig, formatMoney, formatRawMoney } from '../utils/format';
 import { ColorTheme } from '../utils/themeColors';
-import { Printer, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
+import { DEFAULT_CVE_HEADER } from '../assets/header';
+import { exportWorksheetToPdf } from '../utils/pdfGenerator';
+import { Printer, Download, Upload, Trash2, RotateCcw, Loader2, FileCheck } from 'lucide-react';
 
 interface WorksheetTabProps {
   groupNo: string;
@@ -30,6 +32,11 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
   onPrint,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const printableAreaRef = useRef<HTMLDivElement>(null);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+
+  // Use either the user's custom header or the provided default CVE Colleges header
+  const currentBanner = customHeaderImage !== null ? customHeaderImage : DEFAULT_CVE_HEADER;
 
   const {
     directCost,
@@ -52,110 +59,157 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
     if (!file) return;
 
     if (!file.type.startsWith('image/')) {
-      alert('Please select a valid image file (PNG, JPG, SVG, WebP).');
+      alert('Please select an image file (PNG, JPG, WebP).');
       return;
     }
 
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      onUpdateHeaderImage(result);
+      onUpdateHeaderImage(reader.result as string);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!printableAreaRef.current) return;
+    setIsGeneratingPdf(true);
+    try {
+      await exportWorksheetToPdf(printableAreaRef.current, productName || 'Cooked_Product');
+    } catch (err) {
+      console.error('PDF export failed, falling back to print dialog:', err);
+      onPrint();
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
     <div className="space-y-4 pb-24">
       {/* Top action and header controls bar - Screen only */}
-      <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div className={`p-2 rounded-xl ${themeColor.accentBg}`}>
-            <ImageIcon className={`w-5 h-5 ${themeColor.accentText}`} />
-          </div>
+      <div className="no-print bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4 rounded-2xl shadow-xs">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div>
-            <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
-              Worksheet Header & Print Layout
-            </h3>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              {customHeaderImage
-                ? 'Custom header banner active'
-                : 'Upload your own school or department banner'}
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100">
+                Official School Worksheet & PDF Export
+              </h3>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+              Includes preloaded official CVE Colleges header banner and A4 portrait print layout.
             </p>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-          {/* Hidden File Input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            onChange={handleFileChange}
-            className="hidden"
-          />
-
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl transition cursor-pointer"
-          >
-            <Upload className="w-3.5 h-3.5" />
-            {customHeaderImage ? 'Change Banner' : 'Upload Banner'}
-          </button>
-
-          {customHeaderImage && (
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            {/* Direct PDF File Download */}
             <button
               type="button"
-              onClick={() => onUpdateHeaderImage(null)}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-700 dark:text-red-300 text-xs font-bold rounded-xl transition cursor-pointer"
-              title="Remove custom header"
+              disabled={isGeneratingPdf}
+              onClick={handleDownloadPdf}
+              className={`inline-flex items-center gap-1.5 px-3.5 py-2 ${themeColor.btnBg} text-xs font-bold rounded-xl shadow-xs transition active:scale-95 disabled:opacity-50 cursor-pointer`}
+              title="Generate and download PDF file directly to your device"
             >
-              <Trash2 className="w-3.5 h-3.5" />
-              Remove Banner
+              {isGeneratingPdf ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Generating PDF...
+                </>
+              ) : (
+                <>
+                  <Download className="w-4 h-4" />
+                  Save / Download PDF
+                </>
+              )}
             </button>
-          )}
 
-          <button
-            type="button"
-            onClick={onPrint}
-            className={`inline-flex items-center gap-1.5 px-4 py-2 ${themeColor.btnBg} text-xs font-bold rounded-xl shadow-xs transition cursor-pointer`}
-          >
-            <Printer className="w-4 h-4" />
-            Print / Save as PDF
-          </button>
-        </div>
-      </div>
-
-      {/* The Printable Worksheet Container */}
-      <div className="worksheet-paper rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
-        {/* User-Uploaded Custom Header Banner */}
-        {customHeaderImage ? (
-          <div className="custom-header-banner w-full mb-4 text-center">
-            <img
-              alt="School or Organization Header"
-              src={customHeaderImage}
-              className="block w-full h-auto max-h-[110px] object-contain object-center mx-auto"
-            />
+            {/* Print / System PDF Dialog */}
+            <button
+              type="button"
+              onClick={onPrint}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-800 hover:bg-slate-900 dark:bg-slate-700 dark:hover:bg-slate-600 text-white text-xs font-bold rounded-xl shadow-xs transition active:scale-95 cursor-pointer"
+              title="Open system print and PDF dialog"
+            >
+              <Printer className="w-4 h-4" />
+              Print Dialog
+            </button>
           </div>
-        ) : (
-          /* Clean placeholder header when no image is uploaded */
-          <div className="no-print my-2 p-4 border-2 border-dashed border-slate-300 dark:border-slate-700 rounded-xl text-center">
+        </div>
+
+        {/* Banner Management Controls */}
+        <div className="mt-3 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-1.5 text-slate-600 dark:text-slate-300">
+            <FileCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            <span>
+              Header: <strong>{currentBanner ? 'CVE Colleges Official Header' : 'None'}</strong>
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="inline-flex flex-col items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 cursor-pointer"
+              className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition cursor-pointer"
             >
-              <Upload className="w-6 h-6 text-slate-400" />
-              <span className="font-semibold">Click here to upload your own school / organization header banner</span>
-              <span className="text-[11px] text-slate-400">Supports PNG, JPG, or SVG banner graphics</span>
+              <Upload className="w-3 h-3" />
+              Upload Other
             </button>
-          </div>
-        )}
 
-        <h1 className="text-center font-serif text-[24px] font-bold text-slate-900 dark:text-white mb-0.5">
+            {customHeaderImage && (
+              <button
+                type="button"
+                onClick={() => onUpdateHeaderImage(null)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg text-xs font-medium transition cursor-pointer"
+                title="Reset back to default CVE Colleges header"
+              >
+                <RotateCcw className="w-3 h-3 text-orange-600" />
+                Reset to CVE
+              </button>
+            )}
+
+            {currentBanner && (
+              <button
+                type="button"
+                onClick={() => onUpdateHeaderImage('')}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg text-xs font-medium transition cursor-pointer"
+                title="Remove banner completely"
+              >
+                <Trash2 className="w-3 h-3" />
+                Clear
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* The Printable Worksheet Card (captured by jsPDF & rendered for @media print) */}
+      <div
+        ref={printableAreaRef}
+        id="printable-worksheet"
+        className="worksheet-paper rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 bg-white"
+      >
+        {/* Header Banner */}
+        {currentBanner ? (
+          <div className="custom-header-banner w-full mb-3 text-center" aria-label="School Header Banner">
+            <img
+              alt="CVE Colleges, Inc. Header"
+              src={currentBanner}
+              className="block w-full h-auto max-h-[105px] object-contain object-center mx-auto"
+            />
+          </div>
+        ) : null}
+
+        <h1 className="text-center font-serif text-[23px] font-bold text-slate-900 dark:text-white mb-0.5">
           Costing and Pricing of Cooked Products
         </h1>
-        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-5">
+        <p className="text-center text-sm text-slate-500 dark:text-slate-400 mb-4">
           Food Technology
         </p>
 
@@ -295,7 +349,7 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
             <div className="mathline">
               <span>=</span> {formatRawMoney(pricePerServing, currency, 5)}
             </div>
-            <div className="mathline final-math">
+            <div className="mathline final-math" style={{ color: themeColor.hex }}>
               <span>=</span> {formatMoney(pricePerServing, currency)} per serving
             </div>
           </div>
@@ -322,7 +376,7 @@ export const WorksheetTab: React.FC<WorksheetTabProps> = ({
             <div className="mathline">
               = {formatMoney(totalSales, currency)} − {formatMoney(totalCost, currency)}
             </div>
-            <div className="mathline final-math">
+            <div className="mathline final-math" style={{ color: themeColor.hex }}>
               = {formatMoney(batchProfit, currency)} total profit for the batch
             </div>
             <div className="mathline">

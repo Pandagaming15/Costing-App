@@ -345,7 +345,7 @@ export const App: React.FC = () => {
       </main>
 
       {/* Print View Wrapper (Always available for @media print) */}
-      <div className="print-view-wrapper hidden">
+      <div className="print-only-container">
         <WorksheetTab
           groupNo={groupNo}
           productName={productName}
