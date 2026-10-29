@@ -1,0 +1,8 @@
+{
+  "name": "Cooked Product Costing",
+  "description": "Food Technology worksheet for calculating ingredient direct costs, indirect overhead, unit cost per serving, mark-up pricing, and batch profit with printable A4 school layout.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
